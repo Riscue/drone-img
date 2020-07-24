@@ -1,0 +1,16 @@
+kind: pipeline
+type: docker
+name: default
+
+steps:
+  - name: publish
+    image: riscue/drone-img
+    settings:
+      auto_tag: true
+      username: riscue
+      password:
+        from_secret: DOCKER_PASSWORD
+
+trigger:
+  event:
+    - tag

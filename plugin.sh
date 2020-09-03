@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REGISTRY=${PLUGIN_REGISTRY:-}
-REPO=${PLUGIN_REPO:-$(echo $DRONE_REPO | tr '[A-Z]' '[a-z]')}
+REPO=${PLUGIN_REPO:-}
 
 if [ "${REGISTRY}" ]; then
   IMAGE=${REGISTRY}/${REPO}
@@ -13,7 +13,9 @@ fi
 
 if [ "${PLUGIN_USERNAME:-}" ] && [ "${PLUGIN_PASSWORD:-}" ]; then
 	echo "img login ${REGISTRY} -u ${PLUGIN_USERNAME} -p ${PLUGIN_PASSWORD}"
-	echo $PLUGIN_PASSWORD | img login $REGISTRY -u $PLUGIN_USERNAME --password-stdin
+	if [ "${UNIT_TEST:-false}" != "true" ]; then
+    echo $PLUGIN_PASSWORD | img login $REGISTRY -u $PLUGIN_USERNAME --password-stdin
+  fi
 elif [ "${PLUGIN_USERNAME:-}" ] || [ "${PLUGIN_PASSWORD:-}" ]; then
 	echo "Username and Password must be provided same time" && false
 fi
@@ -66,15 +68,32 @@ else
     TAGS="--tag=none"
 fi
 
-img build \
-	--file=${DOCKERFILE} \
-	${TAGS} \
-	${CONTEXT} \
-	${DEBUG:-} \
-	${NO_CACHE:-} \
-	${NO_CONSOLE:-} && \
+CMD="img build \
+    --file=${DOCKERFILE} \
+    ${TAGS} \
+    ${CONTEXT} \
+    ${DEBUG:-} \
+    ${NO_CACHE:-} \
+    ${NO_CONSOLE:-}"
 
-img push \
-	${TAGS//--tag=/} \
-	${DEBUG:-} \
-	${NO_CONSOLE:-}
+if [ "${UNIT_TEST:-false}" == "true" ]; then
+  echo $CMD
+else
+  exec $CMD
+fi
+
+if [ "$TAGS" != "--tag=none" ]; then
+  echo "$TAGS" | sed "s/--tag=//" | \
+  while read tag; do
+    CMD="img push \
+        ${tag} \
+        ${DEBUG:-} \
+        ${NO_CONSOLE:-}"
+
+    if [ "${UNIT_TEST:-false}" == "true" ]; then
+      echo $CMD
+    else
+      exec $CMD
+    fi
+  done
+fi

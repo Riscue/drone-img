@@ -3,14 +3,38 @@ type: docker
 name: default
 
 steps:
+  - name: test
+    image: alpine:3.12
+    commands:
+      - ./test.sh
+
   - name: publish
-    image: riscue/drone-img
+    image: plugins/docker
     settings:
+      repo: riscue/drone-img
       auto_tag: true
       username: riscue
       password:
         from_secret: DOCKER_PASSWORD
+    when:
+      event:
+        - tag
 
-trigger:
-  event:
-    - tag
+  - name: notify
+    image: drillster/drone-email
+    settings:
+      host:
+        from_secret: SMTP_HOST
+      port:
+        from_secret: SMTP_PORT
+      from:
+        from_secret: SMTP_FROM
+      username:
+        from_secret: SMTP_USERNAME
+      password:
+        from_secret: SMTP_PASSWORD
+      skip_verify: true
+    when:
+      status:
+        - changed
+        - failure
